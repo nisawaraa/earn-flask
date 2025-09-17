@@ -6,8 +6,8 @@
 
   <!-- Header -->
   <div class="text-center mb-5">
-    <h1 class="fw-bold text-primary">📊  - การทำนายไข้เลือดออก</h1>
-    <p class="text-muted">การพัฒนาแบบจำลองการเรียนรู้ของเครื่องสำหรับคาดการณ์จำนวนผู้ป่วยไข้เลือดออกในจังหวัดพะเยา</p>
+    <h1 class="fw-bold text-danger">🦟  - การพัฒนาแบบจำลองการเรียนรู้ของเครื่องสำหรับคาดการณ์จำนวนผู้ป่วยไข้เลือดออกในจังหวัดพะเยา</h1>
+    <p class="text-muted"></p>
   </div>
 
   <!-- Summary Cards -->
@@ -30,10 +30,10 @@
 
     <div class="col-md-8 d-flex align-items-center justify-content-center">
       <div class="btn-group shadow-sm" role="group">
-        <button class="btn btn-outline-primary forecast-btn" data-steps="1">ทำนาย 1 เดือน</button>
-        <button class="btn btn-outline-primary forecast-btn" data-steps="3">ทำนาย 3 เดือน</button>
-        <button class="btn btn-outline-primary forecast-btn" data-steps="6">ทำนาย 6 เดือน</button>
-        <button class="btn btn-primary forecast-btn" data-steps="12">พยากรณ์ 12 เดือน</button>
+        <button class="btn btn-outline-danger forecast-btn" data-steps="1">ทำนาย 1 เดือน</button>
+        <button class="btn btn-outline-danger forecast-btn" data-steps="3">ทำนาย 3 เดือน</button>
+        <button class="btn btn-outline-danger forecast-btn" data-steps="6">ทำนาย 6 เดือน</button>
+        <button class="btn btn-danger forecast-btn" data-steps="12">ทำนาย 12 เดือน</button>
       </div>
     </div>
   </div>
@@ -55,9 +55,7 @@
         <div class="card-body">
           <h6 class="fw-bold text-primary">🔵 XGBoost: ทำนาย</h6>
           <table class="table table-striped table-hover table-sm" id="tbl-xgb">
-            <thead class="table-light">
-              <tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr>
-            </thead>
+            <thead class="table-light"><tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -69,9 +67,7 @@
         <div class="card-body">
           <h6 class="fw-bold text-success">🟢 SARIMA: ทำนาย</h6>
           <table class="table table-striped table-hover table-sm" id="tbl-sarima">
-            <thead class="table-light">
-              <tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr>
-            </thead>
+            <thead class="table-light"><tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -129,17 +125,14 @@
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      spanGaps: true,
       scales: {
-        y: {
-          beginAtZero: true,
-          suggestedMax: Math.max(...historyValues) * 1.5
-        }
+        y: { beginAtZero: true, suggestedMax: Math.max(...historyValues) * 1.5 }
       },
       plugins: { legend: { position: 'bottom' } }
     }
   });
 
-  // เติมข้อมูลตาราง
   function renderTable(tableId, rows) {
     const tbody = document.querySelector(`#${tableId} tbody`);
     tbody.innerHTML = '';
@@ -150,7 +143,6 @@
     });
   }
 
-  // โหลด forecast
   async function loadForecast(steps=12) {
     const res = await fetch(`/api/forecast?steps=${steps}`);
     const data = await res.json();
@@ -175,17 +167,13 @@
 
     renderTable('tbl-xgb', xgb);
     renderTable('tbl-sarima', sarima);
-
-    document.querySelectorAll('.forecast-btn').forEach(btn => {
-      btn.classList.toggle('btn-primary', parseInt(btn.dataset.steps) === steps);
-      btn.classList.toggle('btn-outline-primary', parseInt(btn.dataset.steps) !== steps);
-    });
   }
 
   document.querySelectorAll('.forecast-btn').forEach(btn => {
     btn.addEventListener('click', () => loadForecast(parseInt(btn.dataset.steps)));
   });
 
-  loadForecast(12); // เริ่มต้นโหลดเป็น 12 เดือน
+  loadForecast(12);
 </script>
+
 {% endblock %}
