@@ -1,5 +1,4 @@
-# app.py
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for
 import pandas as pd
 import numpy as np
 import joblib
@@ -10,7 +9,6 @@ import base64
 import folium
 import matplotlib
 from branca.colormap import LinearColormap   # ✅ ใช้ LinearColormap ตรง ๆ
-from branca.colormap import LinearColormap
 
 matplotlib.rcParams['font.family'] = 'Tahoma'   # หรือ 'TH Sarabun New'
 
@@ -89,8 +87,13 @@ def xgb_forecast_steps(series_cases, last_year, last_month, steps):
     return forecasts
 
 # ------------------ Routes ------------------
-@app.route('/')
-def index():
+
+@app.route("/")
+def welcome():
+    return render_template("welcome.html")
+
+@app.route("/dashboard")
+def dashboard():
     last_year = monthly.iloc[-1]['year']
     last_month = monthly.iloc[-1]['month']
     latest_cases = int(monthly.iloc[-1]['cases'])
@@ -120,7 +123,7 @@ def index():
 
 @app.route('/api/forecast')
 def api_forecast():
-    steps = int(request.args.get('steps', 12))
+    steps = int(request.args.get('steps', 3))
     steps = max(1, min(12, steps))
 
     last_year = int(monthly.iloc[-1]['year'])
@@ -158,52 +161,47 @@ def yearly():
     ax.set_ylabel('จำนวนผู้ป่วย')
     img_yearly = plot_to_img(fig)
 
-    # ✅ แปลงเป็น list[dict] เช่น [{'year': 2017, 'cases': 75}, ...]
-    yearly_data = yearly_sum.to_dict(orient='records')
-
     return render_template(
         'yearly.html',
-        yearly=yearly_data,
+        yearly=yearly_sum.to_dict(orient='records'),
         yearly_img=img_yearly
     )
 
 @app.route("/phayao")
 def phayao():
-    # ดึงค่าปีจาก query string (ถ้าไม่มีจะเป็น None)
-    year = request.args.get("year", type=int)
-
-    # กรองข้อมูลตามปี
-    tambon_cases = df.copy()
-    if year:
-        tambon_cases = tambon_cases[tambon_cases['year'] == year]
-
+    # รวมจำนวนผู้ป่วยราย "ตำบล" จากข้อมูลหลัก
     tambon_cases = (
-        tambon_cases.groupby('ตำบล', as_index=False)['cases']
-                    .sum()
-                    .rename(columns={'cases': 'count'})
+        df.groupby('ตำบล', as_index=False)['cases']
+          .sum()
+          .rename(columns={'cases': 'count'})
     )
 
-    # โหลดพิกัด
+    # โหลดพิกัดตำบลจาก CSV
     coords = pd.read_csv("phayao_tambon_coordinates.csv")
     coords.columns = coords.columns.str.strip()
 
-    # รวมเข้ากับจำนวนผู้ป่วย
+    # รวมพิกัด + จำนวนผู้ป่วย
     merged = coords.merge(tambon_cases, on='ตำบล', how='left')
     merged['count'] = merged['count'].fillna(0)
     merged = merged.dropna(subset=['lat', 'lon'])
 
-    max_count = float(merged['count'].max()) if len(merged) else 1.0
-    center_lat = merged['lat'].mean() if len(merged) else 19.25
-    center_lon = merged['lon'].mean() if len(merged) else 99.9
+    max_count = float(merged['count'].max())
+    if max_count == 0:
+        max_count = 1.0
 
-    # colormap ไล่สี เขียว → เหลือง → ส้ม → แดง
+    if len(merged) > 0:
+        center_lat = merged['lat'].mean()
+        center_lon = merged['lon'].mean()
+    else:
+        center_lat, center_lon = 19.25, 99.9
+
+    # ✅ ไล่สี เขียว → เหลือง → ส้ม → แดง
     colormap = LinearColormap(
-    colors=['green', 'yellow', 'orange', 'red'],
-    vmin=merged['count'].min(),
-    vmax=merged['count'].max()
-)
-
-    colormap.caption = f"จำนวนผู้ป่วย{' ปี '+str(year) if year else ' (รวมทุกปี)'}"
+        colors=['green', 'yellow', 'orange', 'red'],
+        vmin=merged['count'].min(),
+        vmax=merged['count'].max()
+    )
+    colormap.caption = "จำนวนผู้ป่วย (น้อย → มาก)"
 
     m = folium.Map(location=[center_lat, center_lon], zoom_start=9, tiles="cartodbpositron")
 
@@ -220,13 +218,8 @@ def phayao():
         ).add_to(m)
 
     colormap.add_to(m)
-
-    return render_template(
-        "phayao.html",
-        map_html=m._repr_html_(),
-        year=year,
-        years=sorted(df['year'].unique())
-    )
+    map_html = m._repr_html_()
+    return render_template("phayao.html", map_html=map_html)
 
 @app.route('/sarima_forecast')
 def sarima_forecast_api():
