@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Trend{% endblock %}
+{% block content %}
+<div class="container">
+<h2>Trend API Data</h2>
+<p>This page fetches data from /api/trend</p>
+<canvas id="trendChart" width="400" height="200"></canvas>
+</div>
+<script>
+fetch("/api/trend")
+.then(r => r.json())
+.then(data => {
+const ctx = document.getElementById('trendChart').getContext('2d');
+new Chart(ctx, {
+type: 'line',
+data: {
+labels: data.map(r => r.date),
+datasets: [{
+label: 'Cases',
+data: data.map(r => r.cases),
+borderColor: 'green',
+fill: false
+}]
+}
+});
+});
+</script>
+{% endblock %}
+
+
+# ---------------- form.html (optional helper) ----------------
+{% extends 'base.html' %}
+{% block title %}Form Demo{% endblock %}
+{% block content %}
+<div class="container">
+<h2>Sample Form</h2>
+<form>
+<input type="text" placeholder="Example">
+<button>Submit</button>
+</form>
+</div>
+{% endblock %}

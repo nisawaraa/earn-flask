@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8" />
+    <title>รายงานผู้ป่วยล่าสุด</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        a.button {
+            display: inline-block;
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        a.button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>รายงานผู้ป่วยล่าสุด</h1>
+    <p>จำนวนผู้ป่วยล่าสุด: 49</p>
+    <p>เปลี่ยนแปลงจากเดือนก่อนหน้า: <span style="color:red;">ลดลง -16 คน</span></p>
+
+    <p><strong>แนวโน้มย้อนหลัง 12 เดือน</strong></p>
+    <!-- สมมติว่าคุณมีรูปกราฟย้อนหลัง 12 เดือนใน static/images -->
+    <img src="{{ url_for('static', filename='images/last_12_months.png') }}" alt="กราฟย้อนหลัง 12 เดือน" style="max-width: 600px;">
+
+    <p>
+        <a href="{{ url_for('yearly') }}" class="button">ดูกราฟย้อนหลังรายปี</a>
+        <a href="{{ url_for('phayao') }}" class="button">เจาะลึกพื้นที่ จ.พะเยา</a>
+    </p>
+</body>
+</html>

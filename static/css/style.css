@@ -1,0 +1,68 @@
+body {
+    font-family: 'Prompt', sans-serif;
+    background-color: #f4f9ff;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 30px;
+    background-color: #ffffff;
+    margin-top: 40px;
+    box-shadow: 0 0 20px rgba(0, 128, 255, 0.1);
+    border-radius: 10px;
+}
+
+h1 {
+    color: #0a5ba5;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.section {
+    margin-bottom: 30px;
+}
+
+.highlight-red {
+    color: #d60000;
+    font-weight: bold;
+}
+
+.highlight-blue {
+    color: #0077cc;
+    font-weight: bold;
+}
+
+.predictions h3 {
+    font-size: 18px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.badge-predict {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-forecast {
+    background-color: #28a745;
+    color: white;
+}
+
+.chart-container {
+    text-align: center;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}

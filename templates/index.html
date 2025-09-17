@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}EARN Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="background: #f8f9fa; min-height: 100vh;">
+
+  <!-- Header -->
+  <div class="text-center mb-5">
+    <h1 class="fw-bold text-primary">📊  - การทำนายไข้เลือดออก</h1>
+    <p class="text-muted">การพัฒนาแบบจำลองการเรียนรู้ของเครื่องสำหรับคาดการณ์จำนวนผู้ป่วยไข้เลือดออกในจังหวัดพะเยา</p>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">จำนวนผู้ป่วยล่าสุด</h6>
+          <p class="display-5 fw-bold text-danger">{{ latest_cases }}</p>
+          <p>
+            {% if trend_up %}
+              <span class="badge bg-danger">▲ เพิ่มขึ้น {{ diff }}</span>
+            {% else %}
+              <span class="badge bg-success">▼ ลดลง {{ diff|abs }}</span>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8 d-flex align-items-center justify-content-center">
+      <div class="btn-group shadow-sm" role="group">
+        <button class="btn btn-outline-primary forecast-btn" data-steps="1">ทำนาย 1 เดือน</button>
+        <button class="btn btn-outline-primary forecast-btn" data-steps="3">ทำนาย 3 เดือน</button>
+        <button class="btn btn-outline-primary forecast-btn" data-steps="6">ทำนาย 6 เดือน</button>
+        <button class="btn btn-primary forecast-btn" data-steps="12">พยากรณ์ 12 เดือน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card shadow-sm border-0 mb-5">
+    <div class="card-body">
+      <h6 class="fw-bold text-secondary">📈 แนวโน้มย้อนหลัง 12 เดือน + ทำนาย</h6>
+      <div style="height: 420px;">
+        <canvas id="forecastChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forecast Tables -->
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="fw-bold text-primary">🔵 XGBoost: ทำนาย</h6>
+          <table class="table table-striped table-hover table-sm" id="tbl-xgb">
+            <thead class="table-light">
+              <tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="fw-bold text-success">🟢 SARIMA: ทำนาย</h6>
+          <table class="table table-striped table-hover table-sm" id="tbl-sarima">
+            <thead class="table-light">
+              <tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Links -->
+  <div class="text-center mt-5">
+    <a href="/yearly" class="btn btn-outline-dark me-2">📅 ดูภาพรวมทั้งปี</a>
+    <a href="/phayao" class="btn btn-outline-success">🗺️ เจาะลึกพื้นที่ จ.พะเยา (แผนที่)</a>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const historyLabels = {{ history_labels|tojson }};
+  const historyValues = {{ history_values|tojson }};
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+
+  let chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: historyLabels.slice(),
+      datasets: [
+        {
+          label: 'จริง (12 เดือนล่าสุด)',
+          data: historyValues.slice(),
+          borderColor: '#000',
+          backgroundColor: '#000',
+          borderWidth: 2,
+          pointRadius: 3
+        },
+        {
+          label: 'XGBoost forecast',
+          data: [],
+          borderColor: '#007bff',
+          backgroundColor: '#007bff',
+          borderDash: [6,4],
+          borderWidth: 2,
+          pointRadius: 3
+        },
+        {
+          label: 'SARIMA forecast',
+          data: [],
+          borderColor: '#28a745',
+          backgroundColor: '#28a745',
+          borderDash: [6,4],
+          borderWidth: 2,
+          pointRadius: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max(...historyValues) * 1.5
+        }
+      },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  // เติมข้อมูลตาราง
+  function renderTable(tableId, rows) {
+    const tbody = document.querySelector(`#${tableId} tbody`);
+    tbody.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.date}</td><td>${r.prediction}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // โหลด forecast
+  async function loadForecast(steps=12) {
+    const res = await fetch(`/api/forecast?steps=${steps}`);
+    const data = await res.json();
+
+    const xgb = data.xgb;
+    const sarima = data.sarima;
+
+    const newLabels = historyLabels.slice();
+    xgb.forEach(f => newLabels.push(f.date));
+
+    const real = historyValues.slice();
+    const lastReal = real[real.length - 1];
+
+    const xgbData = new Array(real.length - 1).fill(null).concat([lastReal]).concat(xgb.map(f => f.prediction));
+    const sarimaData = new Array(real.length - 1).fill(null).concat([lastReal]).concat(sarima.map(f => f.prediction));
+
+    chart.data.labels = newLabels;
+    chart.data.datasets[0].data = real;
+    chart.data.datasets[1].data = xgbData;
+    chart.data.datasets[2].data = sarimaData;
+    chart.update();
+
+    renderTable('tbl-xgb', xgb);
+    renderTable('tbl-sarima', sarima);
+
+    document.querySelectorAll('.forecast-btn').forEach(btn => {
+      btn.classList.toggle('btn-primary', parseInt(btn.dataset.steps) === steps);
+      btn.classList.toggle('btn-outline-primary', parseInt(btn.dataset.steps) !== steps);
+    });
+  }
+
+  document.querySelectorAll('.forecast-btn').forEach(btn => {
+    btn.addEventListener('click', () => loadForecast(parseInt(btn.dataset.steps)));
+  });
+
+  loadForecast(12); // เริ่มต้นโหลดเป็น 12 เดือน
+</script>
+{% endblock %}

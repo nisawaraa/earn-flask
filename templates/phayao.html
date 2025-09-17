@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+    <h2>🌍 รายงานผู้ป่วย จ.พะเยา</h2>
+    <p>แผนที่ความหนาแน่นของผู้ป่วย (เลือกปีด้านล่าง)</p>
+
+    <!-- Dropdown เลือกปี -->
+    <form method="get" action="/phayao" style="margin-bottom:15px;">
+        <label for="year">เลือกปี:</label>
+        <select name="year" id="year" onchange="this.form.submit()">
+            <option value="">รวมทุกปี</option>
+            {% for y in years %}
+                <option value="{{y}}" {% if year == y %}selected{% endif %}>{{y}}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <div class="card shadow-sm p-3">
+        {{ map_html|safe }}
+    </div>
+
+    <a href="/" class="btn btn-danger mt-3">← กลับหน้าหลัก</a>
+</div>
+{% endblock %}

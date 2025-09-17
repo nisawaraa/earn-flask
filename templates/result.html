@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Result{% endblock %}
+{% block content %}
+<div class="container">
+<h2>Prediction Result</h2>
+<p>Inputs: {{ inputs }}</p>
+{% if prediction %}
+<p><b>Prediction:</b> {{ prediction }}</p>
+{% endif %}
+{% if forecast %}
+<h3>Forecast</h3>
+<ul>
+{% for f in forecast %}
+<li>{{ f }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+<p>Model used: {{ model }}</p>
+</div>
+{% endblock %}
