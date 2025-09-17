@@ -1,11 +1,12 @@
 flask
-gunicorn
 pandas
 numpy
-joblib
+matplotlib
 scikit-learn
+joblib
 xgboost
 statsmodels
 folium
-matplotlib
+branca
 openpyxl
+gunicorn
