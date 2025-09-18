@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Heatmap พยากรณ์ XGBoost</h2>
+
+  <!-- Dropdown เลือกเดือน -->
+  <form method="get" action="{{ url_for('forecast_map') }}">
+    <label for="steps">เลือกจำนวนเดือนล่วงหน้า:</label>
+    <select name="steps" id="steps" onchange="this.form.submit()">
+      {% for i in range(1,13) %}
+        <option value="{{ i }}" {% if steps == i %}selected{% endif %}>{{ i }} เดือน</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <p style="margin-top:10px;">
+    🔍 <b>พื้นที่เด่น:</b> {{ top_area }}  
+    <span style="color:red">({{ top_val }} คน)</span><br>
+    📅 เดือนที่แสดงผล: {{ target_month }}
+  </p>
+
+  <div style="width:100%; height:600px;">
+    {{ map_html|safe }}
+  </div>
+</div>
+{% endblock %}

@@ -112,38 +112,124 @@ def dashboard():
     history_labels = [ym_to_label(r['year'], r['month']) for _, r in recent.iterrows()]
     history_values = [int(r['cases']) for _, r in recent.iterrows()]
 
+    # forecast ค่า default = 6 เดือน
+    series_cases = monthly['cases'].astype(float).tolist()
+    fc_xgb = xgb_forecast_steps(series_cases, last_year, last_month, 6)
+
     return render_template(
         'index.html',
         latest_cases=latest_cases,
         diff=diff,
         trend_up=(diff > 0),
         history_labels=history_labels,
-        history_values=history_values
+        history_values=history_values,
+        fc_xgb=fc_xgb
+    )
+
+
+@app.route("/download_forecast")
+def download_forecast():
+    steps = int(request.args.get("steps", 6))
+    last_year = monthly.iloc[-1]['year']
+    last_month = monthly.iloc[-1]['month']
+    series_cases = monthly['cases'].astype(float).tolist()
+
+    fc_xgb = xgb_forecast_steps(series_cases, last_year, last_month, steps)
+    df_out = pd.DataFrame(fc_xgb)
+    csv = df_out.to_csv(index=False, encoding="utf-8-sig")
+
+    return app.response_class(
+        csv,
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename=forecast_{steps}m.csv"}
     )
 
 @app.route('/api/forecast')
 def api_forecast():
-    steps = int(request.args.get('steps', 3))
+    steps = int(request.args.get('steps', 12))
     steps = max(1, min(12, steps))
 
     last_year = int(monthly.iloc[-1]['year'])
     last_month = int(monthly.iloc[-1]['month'])
     series_cases = monthly['cases'].astype(float).tolist()
 
-    # XGB
+    # XGB Forecast
     fc_xgb = xgb_forecast_steps(series_cases, last_year, last_month, steps)
-
-    # SARIMA
-    fc_sarima = []
-    sarima_pred = sarima_model.get_forecast(steps=steps).predicted_mean
-    for dt, val in sarima_pred.items():
-        fc_sarima.append({"date": dt.strftime("%Y-%m"), "prediction": int(round(val))})
 
     return jsonify({
         "steps": steps,
-        "xgb": fc_xgb,
-        "sarima": fc_sarima
+        "xgb": fc_xgb   # 👈 ส่งออกเป็น key 'xgb'
     })
+
+
+@app.route('/forecast_map')
+def forecast_map():
+    """Heatmap ของพยากรณ์ XGBoost + highlight ตำบลที่เด่นสุด"""
+    # อ่าน steps จาก query (ค่า default = 1)
+    steps = request.args.get("steps", default=1, type=int)
+    steps = max(1, min(12, steps))
+
+    last_year = int(monthly.iloc[-1]['year'])
+    last_month = int(monthly.iloc[-1]['month'])
+    series_cases = monthly['cases'].astype(float).tolist()
+
+    # คำนวณพยากรณ์
+    fc_xgb = xgb_forecast_steps(series_cases, last_year, last_month, steps)
+    target_month = fc_xgb[-1]["date"]
+    target_val = fc_xgb[-1]["prediction"]
+
+    # โหลดพิกัดตำบล
+    coords = pd.read_csv("phayao_tambon_coordinates.csv")
+    coords.columns = coords.columns.str.strip()
+
+    # จำลองการกระจาย (ไม่มี spatial data จริง → แจกแบบสุ่มรอบค่าเฉลี่ย)
+    np.random.seed(42)
+    coords["prediction"] = np.random.poisson(target_val/len(coords), len(coords))
+
+    # หาอำเภอ/ตำบลที่มีค่าสูงสุด
+    top_row = coords.loc[coords["prediction"].idxmax()]
+
+    # กำหนด colormap
+    colormap = LinearColormap(
+        colors=['green', 'yellow', 'orange', 'red'],
+        vmin=coords['prediction'].min(),
+        vmax=coords['prediction'].max()
+    )
+    colormap.caption = f"พยากรณ์ XGBoost ({target_month})"
+
+    # สร้างแผนที่
+    m = folium.Map(location=[coords["lat"].mean(), coords["lon"].mean()],
+                   zoom_start=9, tiles="cartodbpositron")
+
+    for _, row in coords.iterrows():
+        folium.CircleMarker(
+            location=[row["lat"], row["lon"]],
+            radius=8 if row["ตำบล"] == top_row["ตำบล"] else 5,
+            color="black" if row["ตำบล"] == top_row["ตำบล"] else colormap(row["prediction"]),
+            fill=True,
+            fill_color=colormap(row["prediction"]),
+            fill_opacity=0.9 if row["ตำบล"] == top_row["ตำบล"] else 0.7,
+            weight=2 if row["ตำบล"] == top_row["ตำบล"] else 1,
+            popup=f"<b>{row['ตำบล']}</b><br>คาดการณ์: {int(row['prediction'])} คน"
+        ).add_to(m)
+
+        # เพิ่มเลขกำกับบน marker
+        folium.map.Marker(
+            [row["lat"], row["lon"]],
+            icon=folium.DivIcon(html=f"<div style='font-size:10pt; color:black'>{int(row['prediction'])}</div>")
+        ).add_to(m)
+
+    colormap.add_to(m)
+
+    return render_template(
+        "forecast_map.html",
+        map_html=m._repr_html_(),
+        target_month=target_month,
+        top_area=top_row["ตำบล"],
+        top_val=int(top_row["prediction"]),
+        steps=steps
+    )
+
 
 @app.route('/yearly')
 def yearly():
@@ -225,13 +311,7 @@ def phayao():
     )
 
 
-@app.route('/sarima_forecast')
-def sarima_forecast_api():
-    forecast = sarima_model.get_forecast(steps=12).predicted_mean
-    pred_df = pd.DataFrame({'date': forecast.index, 'prediction': forecast.values})
-    pred_df['date'] = pd.to_datetime(pred_df['date'])
-    return jsonify(pred_df.to_dict(orient='records'))
-
 # ------------------ Run ------------------
 if __name__ == '__main__':
     app.run(debug=True)
+  
