@@ -169,39 +169,37 @@ def yearly():
 
 @app.route("/phayao")
 def phayao():
-    # รวมจำนวนผู้ป่วยราย "ตำบล" จากข้อมูลหลัก
+    # ดึงปีจาก query string (เช่น /phayao?year=2023)
+    year = request.args.get("year", type=int)
+
+    # กรองข้อมูลตามปีที่เลือก
+    tambon_cases = df.copy()
+    if year:
+        tambon_cases = tambon_cases[tambon_cases['year'] == year]
+
     tambon_cases = (
-        df.groupby('ตำบล', as_index=False)['cases']
-          .sum()
-          .rename(columns={'cases': 'count'})
+        tambon_cases.groupby('ตำบล', as_index=False)['cases']
+                    .sum()
+                    .rename(columns={'cases': 'count'})
     )
 
-    # โหลดพิกัดตำบลจาก CSV
     coords = pd.read_csv("phayao_tambon_coordinates.csv")
     coords.columns = coords.columns.str.strip()
 
-    # รวมพิกัด + จำนวนผู้ป่วย
     merged = coords.merge(tambon_cases, on='ตำบล', how='left')
     merged['count'] = merged['count'].fillna(0)
     merged = merged.dropna(subset=['lat', 'lon'])
 
-    max_count = float(merged['count'].max())
-    if max_count == 0:
-        max_count = 1.0
+    max_count = float(merged['count'].max()) if len(merged) else 1.0
+    center_lat = merged['lat'].mean() if len(merged) else 19.25
+    center_lon = merged['lon'].mean() if len(merged) else 99.9
 
-    if len(merged) > 0:
-        center_lat = merged['lat'].mean()
-        center_lon = merged['lon'].mean()
-    else:
-        center_lat, center_lon = 19.25, 99.9
-
-    # ✅ ไล่สี เขียว → เหลือง → ส้ม → แดง
     colormap = LinearColormap(
         colors=['green', 'yellow', 'orange', 'red'],
         vmin=merged['count'].min(),
         vmax=merged['count'].max()
     )
-    colormap.caption = "จำนวนผู้ป่วย (น้อย → มาก)"
+    colormap.caption = f"จำนวนผู้ป่วย{' ปี '+str(year) if year else ' (รวมทุกปี)'}"
 
     m = folium.Map(location=[center_lat, center_lon], zoom_start=9, tiles="cartodbpositron")
 
@@ -218,8 +216,14 @@ def phayao():
         ).add_to(m)
 
     colormap.add_to(m)
-    map_html = m._repr_html_()
-    return render_template("phayao.html", map_html=map_html)
+
+    return render_template(
+        "phayao.html",
+        map_html=m._repr_html_(),
+        year=year,
+        years=sorted(df['year'].unique())
+    )
+
 
 @app.route('/sarima_forecast')
 def sarima_forecast_api():
