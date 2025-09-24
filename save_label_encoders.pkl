@@ -1,0 +1,38 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.preprocessing import LabelEncoder
+import pickle
+
+# 1. โหลดข้อมูล
+df = pd.read_excel('df_final_clean.xlsx')
+
+# 2. ระบุเฉพาะ columns ที่จะใช้เป็น feature
+feature_columns = ['temp_15d_avg', 'rain_15d_avg', 'อาชีพ', 'ตำบล', 'อำเภอ','เดือน', 'ปี', 'ฤดูกาล']
+X = df[feature_columns].copy()
+y = df['cases']
+
+# 3. แปลงข้อมูลหมวดหมู่ด้วย LabelEncoder
+categorical_cols = ['อาชีพ', 'ตำบล', 'อำเภอ', 'ปี', 'ฤดูกาล']
+label_encoders = {}
+
+for col in categorical_cols:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col].astype(str))
+    label_encoders[col] = le
+
+# 4. แบ่ง train/test
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 5. สร้างและฝึกโมเดล
+gb_model = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42)
+gb_model.fit(X_train, y_train)
+
+# 6. บันทึกโมเดลและ label encoders
+with open('xgb_model.pkl', 'wb') as f:
+    pickle.dump(gb_model, f)
+
+with open('label_encoders.pkl', 'wb') as f:
+    pickle.dump(label_encoders, f)
+
+print("✅ โมเดลและ label encoders ถูกบันทึกเรียบร้อยแล้ว (พร้อมใช้งานกับ Flask)")

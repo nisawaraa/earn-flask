@@ -1,42 +1,40 @@
-{% extends 'base.html' %}
-{% block title %}Trend{% endblock %}
-{% block content %}
-<div class="container">
-<h2>Trend API Data</h2>
-<p>This page fetches data from /api/trend</p>
-<canvas id="trendChart" width="400" height="200"></canvas>
-</div>
-<script>
-fetch("/api/trend")
-.then(r => r.json())
-.then(data => {
-const ctx = document.getElementById('trendChart').getContext('2d');
-new Chart(ctx, {
-type: 'line',
-data: {
-labels: data.map(r => r.date),
-datasets: [{
-label: 'Cases',
-data: data.map(r => r.cases),
-borderColor: 'green',
-fill: false
-}]
-}
-});
-});
-</script>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ค่าจริง vs ค่าคาดการณ์</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; margin: 20px; }
+    h2 { color: #333; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    table, th, td { border: 1px solid #aaa; }
+    th, td { padding: 8px; text-align: center; }
+    th { background: #f2f2f2; }
+    img { max-width: 100%; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>ค่าจริง vs ค่าคาดการณ์ (ปี {{ year }})</h2>
 
+  <img src="data:image/png;base64,{{ chart_img }}" alt="Chart">
 
-# ---------------- form.html (optional helper) ----------------
-{% extends 'base.html' %}
-{% block title %}Form Demo{% endblock %}
-{% block content %}
-<div class="container">
-<h2>Sample Form</h2>
-<form>
-<input type="text" placeholder="Example">
-<button>Submit</button>
-</form>
-</div>
-{% endblock %}
+  <table>
+    <thead>
+      <tr>
+        <th>เดือน</th>
+        <th>ค่าจริง</th>
+        <th>ค่าคาดการณ์</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.real }}</td>
+        <td>{{ row.pred }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,20 +1,50 @@
-{% extends 'base.html' %}
-{% block title %}Result{% endblock %}
-{% block content %}
-<div class="container">
-<h2>Prediction Result</h2>
-<p>Inputs: {{ inputs }}</p>
-{% if prediction %}
-<p><b>Prediction:</b> {{ prediction }}</p>
-{% endif %}
-{% if forecast %}
-<h3>Forecast</h3>
-<ul>
-{% for f in forecast %}
-<li>{{ f }}</li>
-{% endfor %}
-</ul>
-{% endif %}
-<p>Model used: {{ model }}</p>
-</div>
-{% endblock %}
+<!-- templates/results.html -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ผลการทำนายรายเดือน</title>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+        }
+        table {
+            border-collapse: collapse;
+            width: 80%;
+            margin: 30px auto;
+        }
+        th, td {
+            border: 1px solid #999;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f0f0f0;
+        }
+        h2 {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h2>ผลการทำนายรายเดือน (XGBoost)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>เดือน</th>
+                <th>จริง</th>
+                <th>XGBoost (คาดการณ์)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td>{{ row.date }}</td>
+                <td>{{ row.cases }}</td>
+                <td>{{ "%.2f"|format(row.predicted) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

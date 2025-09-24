@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}EARN{% endblock %}
+{% block title %}EARN Dashboard{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4" style="background:#f8f9fa;min-height:100vh;">
 
   <!-- Header -->
   <div class="text-center mb-5">
-    <h1 class="fw-bold text-danger">🦟 ทำนายไข้เลือดออก</h1>
-    <p class="text-muted">การพัฒนาแบบจำลองการเรียนรู้ของเครื่องสำหรับคาดการณ์จำนวนผู้ป่วยไข้เลือดออกในจังหวัดพะเยา</p>
+    <h1 class="fw-bold text-danger">🦟 ทำนายไข้เลือดออก (เทียบค่าจริง)</h1>
+    <p class="text-muted">เปรียบเทียบ "ค่าจริง" กับ "XGBoost (คาดการณ์)" รายเดือนของปีที่เลือก</p>
   </div>
 
   <!-- Summary Card -->
@@ -29,57 +29,46 @@
     </div>
   </div>
 
-  <!-- Dropdown -->
-  <div class="text-center mb-4">
+  <!-- Year dropdown + export -->
+  <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
     <div class="dropdown">
-      <button class="btn btn-outline-primary dropdown-toggle" type="button" id="forecastDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-        เลือกช่วงพยากรณ์: <span id="forecastLabel">12 เดือน</span>
+      <button class="btn btn-outline-primary dropdown-toggle" type="button" id="yearDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        เลือกปี: <span id="yearLabel">{{ default_year }}</span>
       </button>
-      <ul class="dropdown-menu" aria-labelledby="forecastDropdown">
-        <li><a class="dropdown-item forecast-option" data-steps="1" href="#">1 เดือน</a></li>
-        <li><a class="dropdown-item forecast-option" data-steps="3" href="#">3 เดือน</a></li>
-        <li><a class="dropdown-item forecast-option" data-steps="6" href="#">6 เดือน</a></li>
-        <li><a class="dropdown-item forecast-option" data-steps="12" href="#">12 เดือน</a></li>
+      <ul class="dropdown-menu">
+        {% for y in years %}
+          <li><a class="dropdown-item year-option" data-year="{{ y }}" href="#">{{ y }}</a></li>
+        {% endfor %}
       </ul>
     </div>
+
+    <a id="btnExport" class="btn btn-outline-secondary" href="/api/compare_csv?year={{ default_year }}">⬇️ ดาวน์โหลด CSV</a>
   </div>
 
   <!-- Chart -->
-  <div class="card shadow-sm border-0 mb-5">
+  <div class="card shadow-sm border-0 mb-4">
     <div class="card-body">
-      <h6 class="fw-bold text-secondary">📈 แนวโน้มย้อนหลัง 12 เดือน + ทำนาย (XGBoost)</h6>
+      <h6 class="fw-bold text-secondary">📈 ค่าจริง vs คาดการณ์ (ปี <span id="yearTitle">{{ default_year }}</span>)</h6>
       <div style="height:420px;">
-        <canvas id="forecastChart"></canvas>
+        <canvas id="compareChart"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- Forecast Table + Note -->
-  <div class="row g-4">
-    <div class="col-md-6">
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <h6 class="fw-bold text-primary">🔵 XGBoost: ทำนาย</h6>
-          <table class="table table-striped table-hover table-sm" id="tbl-xgb">
-            <thead class="table-light">
-              <tr><th>เดือน</th><th>จำนวน (คาดการณ์)</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-6">
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <h6 class="fw-bold">ℹ️ หมายเหตุ</h6>
-          <ul class="mb-0">
-            <li>เส้นสีดำ = ข้อมูลจริง 12 เดือนล่าสุด</li>
-            <li>เส้นสีน้ำเงิน = ทำนาย XGBoost</li>
-          </ul>
-        </div>
-      </div>
+  <!-- Table -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h6 class="fw-bold text-primary">📋 ตาราง: เดือน / จริง / คาดการณ์</h6>
+      <table class="table table-striped table-hover table-sm" id="tbl-compare">
+        <thead class="table-light">
+          <tr><th>เดือน</th><th>จริง</th><th>XGBoost (คาดการณ์)</th></tr>
+        </thead>
+        <tbody>
+          {% for r in compare_data %}
+            <tr><td>{{ r.date }}</td><td>{{ r.real }}</td><td>{{ r.pred }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -92,112 +81,91 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const historyLabels = {{ history_labels|tojson }};
-  const historyValues = {{ history_values|tojson }};
-  const ctx = document.getElementById('forecastChart').getContext('2d');
+  // init from server
+  const initYear = {{ default_year }};
+  const initRows = {{ compare_data|tojson }};
 
-  // ✅ Gradient สำหรับเส้นพยากรณ์
-  const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-  gradient.addColorStop(0, 'rgba(0,123,255,0.6)');
-  gradient.addColorStop(1, 'rgba(0,123,255,0)');
+  const ctx = document.getElementById('compareChart').getContext('2d');
+
+  function buildDatasets(rows){
+    const labels = rows.map(r => r.date);
+    const real   = rows.map(r => r.real);
+    const pred   = rows.map(r => r.pred);
+
+    return { labels, real, pred };
+  }
+
+  let init = buildDatasets(initRows);
 
   let chart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: historyLabels.slice(),
+      labels: init.labels,
       datasets: [
         {
-          label: 'จริง (12 เดือนล่าสุด)',
-          data: historyValues.slice(),
+          label: 'จริง',
+          data: init.real,
           borderColor: '#000',
           backgroundColor: '#000',
           borderWidth: 2,
           pointRadius: 4,
           pointBackgroundColor: '#000',
-          pointHoverRadius: 6,
+          tension: 0.3
         },
         {
-          label: 'XGBoost forecast',
-          data: [],
-          borderColor: '#007bff',
-          backgroundColor: gradient,
+          label: 'XGBoost (คาดการณ์)',
+          data: init.pred,
+          borderColor: '#0d6efd',
+          backgroundColor: '#0d6efd',
           borderDash: [6,4],
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#007bff',
-          pointHoverRadius: 7,
-          fill: true,
-          tension: 0.35
+          pointRadius: 4,
+          pointBackgroundColor: '#0d6efd',
+          tension: 0.3
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: {
-        duration: 1200,  // ✅ เวลา animation
-        easing: 'easeOutQuart' // ✅ สไตล์ animation
-      },
-      plugins: {
-        legend: { position: 'bottom' },
-        tooltip: {
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          titleFont: { weight: 'bold' },
-          callbacks: {
-            label: (ctx) => `${ctx.formattedValue} คน`
-          }
-        }
-      },
-      scales: {
-        x: { grid: { color: 'rgba(200,200,200,0.2)' } },
-        y: { beginAtZero: true, grid: { color: 'rgba(200,200,200,0.2)' } }
-      }
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true } }
     }
   });
 
   function renderTable(rows) {
-    const tbody = document.querySelector('#tbl-xgb tbody');
+    const tbody = document.querySelector('#tbl-compare tbody');
     tbody.innerHTML = '';
     rows.forEach(r => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.date}</td><td>${r.prediction}</td>`;
+      tr.innerHTML = `<td>${r.date}</td><td>${r.real}</td><td>${r.pred}</td>`;
       tbody.appendChild(tr);
     });
   }
 
-  async function loadForecast(steps=12) {
-    const res = await fetch(`/api/forecast?steps=${steps}`);
+  async function loadYear(year) {
+    const res = await fetch(`/api/compare?year=${year}`);
     const data = await res.json();
 
-    const xgb = data.xgb;
-    const newLabels = historyLabels.slice();
-    xgb.forEach(f => newLabels.push(f.date));
-
-    const real = historyValues.slice();
-    const lastReal = real[real.length-1];
-
-    const xgbData = new Array(real.length - 1).fill(null)
-                      .concat([lastReal])
-                      .concat(xgb.map(f => f.prediction));
-
-    chart.data.labels = newLabels;
-    chart.data.datasets[0].data = real;
-    chart.data.datasets[1].data = xgbData;
+    // update chart
+    chart.data.labels = data.labels;
+    chart.data.datasets[0].data = data.real;
+    chart.data.datasets[1].data = data.pred;
     chart.update();
 
-    renderTable(xgb);
-
-    document.getElementById('forecastLabel').innerText = steps + " เดือน";
+    // update table + labels + export link
+    renderTable(data.rows);
+    document.getElementById('yearLabel').innerText = year;
+    document.getElementById('yearTitle').innerText = year;
+    document.getElementById('btnExport').href = `/api/compare_csv?year=${year}`;
   }
 
-  document.querySelectorAll('.forecast-option').forEach(opt => {
-    opt.addEventListener('click', (e) => {
+  document.querySelectorAll('.year-option').forEach(a => {
+    a.addEventListener('click', (e) => {
       e.preventDefault();
-      loadForecast(parseInt(opt.dataset.steps));
+      const y = parseInt(a.dataset.year);
+      loadYear(y);
     });
   });
-
-  loadForecast(12);
 </script>
-
 {% endblock %}
