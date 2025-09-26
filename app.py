@@ -7,6 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from branca.colormap import LinearColormap
 import folium
+from collections import Counter
 
 matplotlib.rcParams['font.family'] = 'Tahoma'
 app = Flask(__name__)
@@ -29,11 +30,7 @@ xgb_model = joblib.load("xgb_regressor.pkl")
 try:
     expected_features = joblib.load("xgb_features.pkl")
 except Exception:
-    # เผื่อไม่มีไฟล์ฟีเจอร์
-    try:
-        expected_features = list(getattr(xgb_model, "feature_names_in_", []))
-    except Exception:
-        expected_features = None
+    expected_features = list(getattr(xgb_model, "feature_names_in_", [])) or None
 
 try:
     with open("label_encoders.pkl", "rb") as f:
@@ -61,32 +58,56 @@ def safe_le_transform(le, series: pd.Series) -> pd.Series:
         else: out.append(-1)
     return pd.Series(out, index=series.index, dtype="int32")
 
-def build_feature_row(row: pd.Series, year: int, month: int) -> pd.DataFrame:
-    # ใช้เฉพาะตัวแปรอิสระ (ไม่ใส่ cases)
-    base = {
-        "temp_15d_avg": float(row.get("temp_15d_avg", np.nan)),
-        "rain_15d_avg": float(row.get("rain_15d_avg", np.nan)),
-        "อาชีพ": str(row.get("อาชีพ","")),
-        "ตำบล": str(row.get("ตำบล","")),
-        "อำเภอ": str(row.get("อำเภอ","")),
-        "เดือน": int(month),
-        "ปี": int(year),
-        "ฤดูกาล": int(month_to_season(month)),
-    }
+def mode_or_empty(s: pd.Series) -> str:
+    s = s.dropna().astype(str)
+    if len(s)==0: return ""
+    return Counter(s).most_common(1)[0][0]
+
+def add_months(year: int, month: int, delta: int):
+    base = (year * 12) + (month - 1) + delta
+    return base // 12, (base % 12) + 1
+
+def build_feature_row(target_year: int, target_month: int) -> pd.DataFrame:
+    sub = df[(df["year"] == target_year) & (df["month"] == target_month)]
+    base = {}
+
+    if not sub.empty:
+        # ค่าเฉลี่ยของตัวเลข
+        num_means = sub.select_dtypes(include=[np.number]).mean(numeric_only=True).to_dict()
+        base["temp_15d_avg"] = float(num_means.get("temp_15d_avg", np.nan))
+        base["rain_15d_avg"] = float(num_means.get("rain_15d_avg", np.nan))
+        # โหมดของ categorical
+        for col in ["อาชีพ","ตำบล","อำเภอ"]:
+            if col in sub.columns:
+                base[col] = mode_or_empty(sub[col])
+    else:
+        base = {"temp_15d_avg":0, "rain_15d_avg":0, "อาชีพ":"","ตำบล":"","อำเภอ":""}
+
+    # meta time
+    base["เดือน"] = int(target_month)
+    base["ปี"] = int(target_year)
+    base["ฤดูกาล"] = int(month_to_season(target_month))
+
     X = pd.DataFrame([base])
 
-    # encode หมวดหมู่ให้ตรงกับตอนเทรน
+    # lag 1–3 เดือน
+    for k in [1,2,3]:
+        yk, mk = add_months(target_year, target_month, -k)
+        lag_sub = df[(df["year"]==yk) & (df["month"]==mk)]
+        X[f"cases_lag{k}"] = float(lag_sub["cases"].sum()) if not lag_sub.empty else 0.0
+
+    # encode categorical
     for col in ["อาชีพ","ตำบล","อำเภอ"]:
         if col in label_encoders:
             X[col] = safe_le_transform(label_encoders[col], X[col])
         else:
             X[col] = -1
 
-    # จัดคอลัมน์ให้ตรงกับ expected features
+    # จัดคอลัมน์
     if expected_features:
         X = X.reindex(columns=expected_features, fill_value=0)
 
-    # บังคับเป็นตัวเลข
+    # force numeric
     for c in X.columns:
         if X[c].dtype == "O":
             X[c] = pd.to_numeric(X[c], errors="coerce").fillna(0)
@@ -95,24 +116,16 @@ def build_feature_row(row: pd.Series, year: int, month: int) -> pd.DataFrame:
 
 def compare_real_vs_xgb_for_year(target_year: int):
     out = []
-    for m in range(1, 12 + 1):
+    for m in range(1,13):
         sub = df[(df["year"] == target_year) & (df["month"] == m)]
-        if sub.empty:
-            continue
-
-        # เลือกแถวแรกของเดือนเป็นตัวแทน
-        row = sub.iloc[0]
-
-        X = build_feature_row(row, target_year, m)
+        if sub.empty: continue
+        real_cases = int(sub["cases"].sum())
+        X = build_feature_row(target_year, m)
         yhat = float(xgb_model.predict(X)[0])
-
-        out.append({
-            "date": ym_label(target_year, m),
-            "real": int(row["cases"]),
-            "pred": int(round(yhat))   # 🔥 ปัดเป็นจำนวนเต็ม
-        })
+        out.append({"date": ym_label(target_year,m),
+                    "real": real_cases,
+                    "pred": int(round(yhat))})
     return out
-
 
 # ---------------- Routes ----------------
 @app.route("/")
@@ -124,7 +137,7 @@ def dashboard():
     latest_cases = int(monthly.iloc[-1]["cases"])
     last_y = int(monthly.iloc[-1]["year"])
     last_m = int(monthly.iloc[-1]["month"])
-    prev_y, prev_m = (last_y-1, 12) if last_m==1 else (last_y, last_m-1)
+    prev_y, prev_m = add_months(last_y, last_m, -1)
     prev_row = monthly[(monthly["year"]==prev_y) & (monthly["month"]==prev_m)]
     prev_cases = int(prev_row["cases"].values[0]) if not prev_row.empty else 0
     diff = latest_cases - prev_cases
@@ -184,13 +197,14 @@ def phayao():
     if year: tambon_cases = tambon_cases[tambon_cases["year"]==year]
     tambon_cases = (tambon_cases.groupby("ตำบล", as_index=False)["cases"]
                     .sum().rename(columns={"cases":"count"}))
-    coords = pd.read_csv("phayao_tambon_coordinates.csv"); coords.columns = coords.columns.str.strip()
+    coords = pd.read_csv("phayao_tambon_coordinates.csv")
+    coords.columns = coords.columns.str.strip()
     merged = coords.merge(tambon_cases, on="ตำบล", how="left")
-    merged["count"] = merged["count"].fillna(0); merged = merged.dropna(subset=["lat","lon"])
+    merged["count"] = merged["count"].fillna(0)
+    merged = merged.dropna(subset=["lat","lon"])
     max_count = float(merged["count"].max()) if len(merged) else 1.0
     center_lat = merged["lat"].mean() if len(merged) else 19.25
     center_lon = merged["lon"].mean() if len(merged) else 99.9
-
     colormap = LinearColormap(colors=["green","yellow","orange","red"],
                               vmin=merged["count"].min(), vmax=merged["count"].max())
     colormap.caption = f"จำนวนผู้ป่วย{' ปี ' + str(year) if year else ' (รวมทุกปี)'}"
