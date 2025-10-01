@@ -1,44 +1,14 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <title>ระบบพยากรณ์ไข้เลือดออก</title>
-  <style>
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: linear-gradient(135deg,#ff6a6a,#ffa36c);
-      font-family: Tahoma, sans-serif;
-    }
-    .welcome-card {
-      background: #fff;
-      padding: 30px;
-      border-radius: 15px;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    h1 { color: #b30000; }
-    a button {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      background: #ff5e5e;
-      color: white;
-      cursor: pointer;
-    }
-    a button:hover { background: #cc0000; }
-  </style>
-</head>
-<body>
-  <div class="welcome-card">
-    <h1>🦟 ไข้เลือดออก</h1>
-    <p>ระบบพยากรณ์จำนวนผู้ป่วยไข้เลือดออก<br>
-       จังหวัดพะเยา ด้วยโมเดล XGBoost</p>
-    <a href="{{ url_for('dashboard') }}"><button>เริ่มต้น</button></a>
-  </div>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="fw-bold text-danger display-4">
+        💉 ระบบทำนายจำนวนผู้ป่วยไข้เลือดออก
+    </h1>
+    <p class="lead mt-3 text-secondary">
+        
+    </p>
+    <a href="{{ url_for('predict_input_page') }}" class="btn btn-lg btn-primary mt-4 px-5">
+        🚀 เริ่มใช้งาน
+    </a>
+</div>
+{% endblock %}

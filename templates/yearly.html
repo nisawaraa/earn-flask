@@ -1,62 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-
-  <h3 class="mb-4">📊 กราฟผู้ป่วยรายปี</h3>
-  <div class="row">
-
-    <!-- การ์ดกราฟ -->
-    <div class="col-lg-7">
-      <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white">
-          กราฟจำนวนผู้ป่วยรายปี
-        </div>
-        <div class="card-body text-center">
-          <img src="data:image/png;base64,{{ yearly_img }}" class="img-fluid" alt="Yearly Chart">
-        </div>
-      </div>
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">📊 กราฟผู้ป่วยไข้เลือดออกรายปี</div>
+    <div class="card-body text-center">
+        <img src="data:image/png;base64,{{ yearly_img }}" class="img-fluid">
+        <table class="table table-striped mt-3">
+            <thead><tr><th>ปี</th><th>จำนวนผู้ป่วย</th></tr></thead>
+            <tbody>
+                {% for row in yearly %}
+                <tr><td>{{ row.year }}</td><td>{{ row.cases }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    <!-- การ์ดสรุป -->
-    <div class="col-lg-5">
-      <div class="card shadow-sm mb-4">
-        <div class="card-header bg-danger text-white">
-          📌 สรุปจำนวนผู้ป่วย
-        </div>
-        <div class="card-body">
-          {% set max_val = (yearly | map(attribute='cases') | max) %}
-          {% for row in yearly %}
-            <p class="mb-1">
-              <b>{{ row['year'] }}</b>:
-              <span class="badge 
-                {% if row['cases'] == max_val %} bg-danger 
-                {% elif row['cases'] > (max_val*0.6) %} bg-warning 
-                {% else %} bg-success {% endif %}">
-                {{ row['cases'] }} คน
-              </span>
-            </p>
-            <div class="progress mb-3" style="height: 8px;">
-              <div class="progress-bar 
-                {% if row['cases'] == max_val %} bg-danger 
-                {% elif row['cases'] > (max_val*0.6) %} bg-warning 
-                {% else %} bg-success {% endif %}"
-                role="progressbar" 
-                style="width: {{ (row['cases'] / max_val * 100) | round(1) }}%;">
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ปุ่มย้อนกลับ -->
-  <div class="text-center mt-3">
-    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-danger">
-      ← กลับหน้าหลัก
-    </a>
-  </div>
-
 </div>
 {% endblock %}

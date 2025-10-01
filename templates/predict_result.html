@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-success text-white">✅ ผลการพยากรณ์</div>
+    <div class="card-body text-center">
+        {% if error %}
+            <p class="text-danger">เกิดข้อผิดพลาด: {{ error }}</p>
+        {% else %}
+            <h4>คาดการณ์จำนวนผู้ป่วย: <span class="text-danger">{{ pred }}</span> คน</h4>
+            {% if real %}
+                <h5>📊 ค่าจริงจากข้อมูล: <span class="text-primary">{{ real }}</span> คน</h5>
+                <p>ความคลาดเคลื่อน (Error): {{ (pred-real)|abs }}</p>
+            {% else %}
+                <p class="text-muted">⚠️ ไม่มีค่าจริงของเดือนนี้ในฐานข้อมูล</p>
+            {% endif %}
+            <hr>
+            <p>🌡 Temp: {{ temp }} | ☔ Rain: {{ rain }} | 👤 {{ occ }} | 📍 {{ tambon }} | 🏠 {{ ampur }} | 🍂 {{ season }}</p>
+            <p>ปี: {{ year }} เดือน: {{ month }}</p>
+        {% endif %}
+        <a href="{{ url_for('predict_input_page') }}" class="btn btn-secondary mt-3">🔄 กลับไปกรอกใหม่</a>
+    </div>
+</div>
+{% endblock %}

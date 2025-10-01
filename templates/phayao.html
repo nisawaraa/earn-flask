@@ -1,31 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container">
-    <h2>🌍 ผู้ป่วยไข้เลือดออกใน จ.พะเยา</h2>
-    <p>แผนที่ความหนาแน่นของผู้ป่วย (เลือกปีด้านล่าง)</p>
-
-  <!-- Dropdown เลือกปี -->
-  <form method="get" action="/phayao" class="mb-3">
-    <div class="row g-2 align-items-center">
-      <div class="col-auto">
-        <label for="year" class="form-label fw-bold">เลือกปี:</label>
-      </div>
-      <div class="col-auto">
-        <select name="year" id="year" class="form-select" onchange="this.form.submit()">
-          <option value="">รวมทุกปี</option>
-          {% for y in years %}
-            <option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-  </form>
-
-  <!-- แผนที่ -->
-  <div class="card shadow-sm border-0">
+<div class="card shadow">
+    <div class="card-header bg-info text-white">🗺 ผู้ป่วยไข้เลือดออกใน จ.พะเยา</div>
     <div class="card-body">
-      {{ map_html|safe }}
+        <form method="get" action="{{ url_for('phayao') }}">
+            <label>เลือกปี:</label>
+            <select name="year" onchange="this.form.submit()" class="form-select w-auto d-inline">
+                <option value="">รวมทุกปี</option>
+                {% for y in years %}
+                <option value="{{ y }}" {% if year==y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <div class="mt-3">{{ map_html|safe }}</div>
     </div>
-  </div>
 </div>
 {% endblock %}

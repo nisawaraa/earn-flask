@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-danger text-white">
+        📋 พยากรณ์จำนวนผู้ป่วย (กรอกค่า Input)
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('predict_api') }}" method="post" class="row g-3">
+
+            <!-- อุณหภูมิ -->
+            <div class="col-md-6">
+                <label class="form-label">🌡 อุณหภูมิเฉลี่ย 15 วัน</label>
+                <input type="number" step="0.1" class="form-control" name="temp_15d_avg" value="{{ default_temp }}">
+            </div>
+
+            <!-- ปริมาณฝน -->
+            <div class="col-md-6">
+                <label class="form-label">☔ ปริมาณฝนเฉลี่ย 15 วัน</label>
+                <input type="number" step="0.1" class="form-control" name="rain_15d_avg" value="{{ default_rain }}">
+            </div>
+
+            <!-- อาชีพ -->
+            <div class="col-md-6">
+                <label class="form-label">👤 อาชีพ</label>
+                <select name="อาชีพ" class="form-select">
+                    {% for occ in occ_list %}
+                    <option value="{{ occ }}">{{ occ }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- ตำบล -->
+            <div class="col-md-6">
+                <label class="form-label">📍 ตำบล</label>
+                <select name="ตำบล" class="form-select">
+                    {% for t in tambon_list %}
+                    <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- อำเภอ -->
+            <div class="col-md-6">
+                <label class="form-label">🏠 อำเภอ</label>
+                <select name="อำเภอ" class="form-select">
+                    {% for a in ampur_list %}
+                    <option value="{{ a }}">{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- ฤดูกาล -->
+            <div class="col-md-6">
+                <label class="form-label">🍂 ฤดูกาล</label>
+                <select name="ฤดูกาล" class="form-select">
+                    {% for s in season_list %}
+                    <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- เลือกปี -->
+            <div class="col-md-6">
+                <label class="form-label">📅 ปี</label>
+                <select name="year" class="form-select">
+                    {% for y in available_years %}
+                    <option value="{{ y }}">{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- เลือกเดือน -->
+            <div class="col-md-6">
+                <label class="form-label">🗓 เดือน</label>
+                <select name="month" class="form-select">
+                    {% for m in range(1,13) %}
+                    <option value="{{ m }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- ปุ่ม -->
+            <div class="col-12 text-center mt-3">
+                <button type="submit" class="btn btn-primary">ทำนาย</button>
+                <a href="/" class="btn btn-secondary">กลับหน้าหลัก</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
